@@ -21,83 +21,75 @@
         to rest on the nodal lines — which is how real Chladni figures form.
   -->
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
     :root {
       --page: #ebebe8; --body: #1a1a1c; --cell: #222225; --ink: #111;
       --label: #c9c9cc; --mute: #77777c;
+      --ink-hi: #ededeb;   /* almost-white: knob ticks, key numbers, focus ring */
+      --ink-dots: #cfcfcd; /* scatter dots, a shade darker */
       --sans: "Helvetica Neue", Helvetica, Inter, -apple-system, Arial, sans-serif;
-      /* full-window layout: square panel sized to the window, controls beside it */
-      --pad: clamp(16px, 4vmin, 56px);
-      --gap: clamp(24px, 5vmin, 72px);
-      --ctl: clamp(300px, 28vmin, 400px);
+      --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      /* full-window layout: square panel on top, controls underneath at the same width */
+      --pad: clamp(16px, 4vmin, 48px);
+      --gap: clamp(18px, 3vmin, 32px);
+      --fill: .77; /* how much of the available space the LED panel takes */
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: var(--body); color: var(--label); font-family: var(--sans); }
     .back { position: fixed; top: 14px; left: 16px; z-index: 1; font-size: 12px; color: var(--mute); text-decoration: none; }
     .back:hover { color: var(--label); }
 
-    .device { height: 100%; padding: var(--pad); display: flex; align-items: center; justify-content: center; gap: var(--gap); }
-    .screen { flex: none;
-      width: min(calc(100vh - 2 * var(--pad)), calc(100vw - 2 * var(--pad) - var(--gap) - var(--ctl)));
-      width: min(calc(100dvh - 2 * var(--pad)), calc(100vw - 2 * var(--pad) - var(--gap) - var(--ctl))); }
-    .controls { flex: none; width: var(--ctl); display: flex; flex-direction: column; gap: 30px; }
-
-    .top { display: flex; justify-content: space-between; align-items: flex-start; }
-    .name { font-weight: 300; font-size: 30px; letter-spacing: .01em; color: #e9e9ea; line-height: 1; }
-    .oled { background: #000; border-radius: 4px; padding: 6px 8px; min-width: 104px;
-      display: grid; grid-template-columns: 1fr 6px; gap: 0 8px; box-shadow: inset 0 0 0 1px #2a2a2e;
-      font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #fff; }
-    .oled .hz, .oled .md { grid-column: 1; white-space: nowrap; }
-    .oled .hz { grid-row: 1; font-size: 22px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
-    .oled .hz small { font-size: 10px; font-weight: 400; margin-left: 2px; }
-    .oled .md { font-size: 10px; color: #bbb; margin-top: 4px; }
-    .oled .md { grid-row: 2; }
-    .oled .meter { grid-column: 2; grid-row: 1 / 3; background: #222; border-radius: 1px; position: relative; overflow: hidden; }
-    .oled .meter i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: #fff; }
+    /* --panel is the LED panel's side length. Below it the controls take about
+       90px plus one row of square keys (panel width / 6), so the panel is
+       capped at (window height − padding − gap − 90px) × 6/7 to fit without scrolling */
+    .device { --panel: calc(var(--fill) * min(100vw - 2 * var(--pad), (100vh - 2 * var(--pad) - var(--gap) - 90px) * 6 / 7));
+      height: 100%; padding: var(--pad); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--gap); }
+    @supports (height: 100dvh) {
+      .device { --panel: calc(var(--fill) * min(100vw - 2 * var(--pad), (100dvh - 2 * var(--pad) - var(--gap) - 90px) * 6 / 7)); }
+    }
+    .screen { flex: none; width: var(--panel); }
+    .controls { flex: none; width: var(--panel); display: flex; flex-direction: column; gap: 22px; }
 
     #panel { display: block; width: 100%; aspect-ratio: 1; cursor: pointer; touch-action: none; }
 
-    .knobs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; align-items: start; }
+    .knobs, .keys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+    .knobs { align-items: start; }
     .ctl { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-    .ctl span { font-size: 12px; color: var(--label); }
-    .knob { position: relative; width: 46px; height: 46px; border-radius: 50%; cursor: ns-resize; touch-action: none;
-      background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--k) 85%, #fff), var(--k) 60%);
-      box-shadow: 0 6px 10px #0009; }
-    .knob::after { content: ""; position: absolute; inset: 0; border-radius: 50%;
-      background: radial-gradient(circle at 50% 15%, var(--dot) 0 3px, transparent 3.6px);
+    .ctl.scatter { grid-column: 6; }
+    .ctl span { font-family: var(--sans); font-size: 12px; color: var(--label); }
+    /* knob: same dark cap and soft shadow as the number buttons, white tick pointer */
+    .knob { --s: 40px; position: relative; width: var(--s); height: var(--s); border-radius: 50%;
+      cursor: ns-resize; touch-action: none;
+      background: #121214; box-shadow: inset 0 1px 0 #ffffff1a, 0 3px 6px #0008; }
+    .knob::after { content: ""; position: absolute; left: calc(50% - 1.5px); top: 4px;
+      width: 3px; height: calc(var(--s) * .34); border-radius: 2px; background: var(--ink-hi);
+      transform-origin: 1.5px calc(var(--s) / 2 - 4px);
       transform: rotate(calc(-135deg + var(--pos, .5) * 270deg)); }
-    .round { width: 46px; height: 46px; border-radius: 50%; border: 0; cursor: pointer; color: #ddd;
-      background: #111113; box-shadow: inset 0 1px 0 #ffffff14, 0 6px 10px #0009;
-      display: grid; place-items: center; }
-    .round:active { background: #29292d; }
+    /* scatter: a plain dark circle like the number buttons, dots in the number colour */
+    .round { width: 40px; height: 40px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: #121214;
+      box-shadow: inset 0 1px 0 #ffffff1a, 0 3px 6px #0008; display: grid; place-items: center;
+      transition: transform .06s, background .12s; }
+    .round svg { width: 46%; height: 46%; fill: var(--ink-dots); stroke: none; }
+    .round:active { transform: scale(.92); background: #2a2a2e; }
 
     .keys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
     .key { position: relative; aspect-ratio: 1; border: 0; padding: 0; border-radius: 10px; background: var(--cell);
       cursor: pointer; display: grid; place-items: center; box-shadow: inset 0 1px 0 #ffffff0d; }
-    .key .cap { width: 74%; aspect-ratio: 1; border-radius: 50%; background: #121214; color: #e6e6e6;
+    .key .cap { width: 74%; aspect-ratio: 1; border-radius: 50%; background: #121214; color: var(--ink-hi);
+      font-family: var(--mono); font-size: 15px; font-weight: 500; line-height: 1;
       display: grid; place-items: center; box-shadow: inset 0 1px 0 #ffffff1a, 0 3px 6px #0008;
       transition: transform .06s, background .12s; }
     .key .dot { position: absolute; top: 7px; right: 7px; width: 5px; height: 5px; border-radius: 50%;
       background: var(--c); opacity: .55; }
     .key.on .dot { opacity: 1; box-shadow: 0 0 8px var(--c); }
     .key.hit .cap { transform: scale(.92); background: #2a2a2e; }
-    svg { width: 46%; height: 46%; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-    .round svg { width: 20px; height: 20px; }
 
-    .key:focus-visible, .knob:focus-visible, .round:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-    .foot { margin: 0; font-size: 12px; color: var(--mute); }
+    .key:focus-visible, .knob:focus-visible, .round:focus-visible { outline: 2px solid var(--ink-hi); outline-offset: 3px; }
 
-    /* portrait windows (phones): panel on top, controls underneath */
-    @media (max-aspect-ratio: 1/1) {
-      .device { flex-direction: column; --gap: 22px; }
-      .screen {
-        width: min(calc(100vw - 2 * var(--pad)), calc(100vh - 2 * var(--pad) - var(--gap) - 290px));
-        width: min(calc(100vw - 2 * var(--pad)), calc(100dvh - 2 * var(--pad) - var(--gap) - 290px)); }
-      .controls { width: min(calc(100vw - 2 * var(--pad)), 440px); gap: 22px; }
-    }
     @media (max-width: 420px) {
-      .knob, .round { width: 38px; height: 38px; }
+      .knob { --s: 38px; }
+      .round { width: 38px; height: 38px; }
       .keys, .knobs { gap: 6px; }
-      .name { font-size: 24px; }
     }
   </style>
 </head>
@@ -109,17 +101,8 @@
     </div>
 
     <div class="controls">
-      <div class="top">
-        <div class="name">m1</div>
-        <div class="oled" aria-live="off">
-          <div class="hz" id="hz">---<small>Hz</small></div>
-          <div class="meter"><i id="meter"></i></div>
-          <div class="md" id="md">mode –</div>
-        </div>
-      </div>
       <div class="knobs" id="knobs"></div>
       <div class="keys" id="keys"></div>
-      <p class="foot">Keys 1–6 · sand settles where the plate stays still</p>
     </div>
   </main>
 
@@ -135,26 +118,22 @@ const lerp = (a, b, f) => a + (b - a) * f;
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
 const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 
-/* ───────────── knobs (4) ───────────── */
+/* ───────────── knobs (5) ───────────── */
 const KNOBS = [
   // key, label, min, max, default, log, cap colour, indicator colour
   ['warble', 'warble', 0, 80, 18, false, '#2a2a2d', '#fff'],
   ['tone',   'tone',   300, 12000, 4000, true, '#56565b', '#fff'],
   ['echo',   'echo',   0, 1, .25, false, '#a0a0a5', '#111'],
   ['length', 'length', .4, 2.5, 1, true, '#dcdcde', '#111'],
+  ['ring',   'ring',   0, 1, 0],   // ring modulation: amount + carrier pitch on one knob
 ];
 const K = {};
 KNOBS.forEach(k => K[k[0]] = k[4]);
 
 /* ───────────── six keys: a sound + a book-cover colour pair each ───────────── */
 const ICONS = {
-  sine:    '<path d="M3 12c3-8 6-8 9 0s6 8 9 0"/>',
-  tri:     '<path d="M3 16l4.5-8 4.5 8 4.5-8 4.5 8"/>',
-  warble:  '<path d="M3 12c1.5-4 3-4 4.5 0s3 4 4.5 0 3-4 4.5 0 3 4 4.5 0"/>',
-  chord:   '<circle cx="8" cy="9" r="2.6"/><circle cx="16" cy="9" r="2.6"/><circle cx="12" cy="16" r="2.6"/>',
-  sweep:   '<path d="M4 18L20 6M14 6h6v6"/>',
-  buzz:    '<path d="M3 16V8h6v8h6V8h6"/>',
-  scatter: '<circle cx="6" cy="7" r=".8"/><circle cx="12" cy="5" r=".8"/><circle cx="18" cy="8" r=".8"/><circle cx="8" cy="13" r=".8"/><circle cx="15" cy="12" r=".8"/><circle cx="5" cy="18" r=".8"/><circle cx="11" cy="19" r=".8"/><circle cx="18" cy="17" r=".8"/>',
+  scatter: [[0,0],[2,0],[4,0],[1,1],[2,1],[3,1],[0,2],[1,2],[2,2],[3,2],[4,2],[1,3],[2,3],[3,3],[0,4],[2,4],[4,4]]
+    .map(([c, r]) => `<circle cx="${3 + c * 4.5}" cy="${3 + r * 4.5}" r="1.9"/>`).join(''),
 };
 const THEMES = [
   { key: 'sine',   plate: '#3a6eaf', sand: '#40a288' }, // blue / green
@@ -196,8 +175,22 @@ function initAudio() {
   A.tone = ctx.createBiquadFilter(); A.tone.type = 'lowpass'; A.tone.Q.value = .7;
   A.comp = ctx.createDynamicsCompressor(); A.comp.threshold.value = -16; A.comp.ratio.value = 4;
   A.master = g(1);
+  // automatic level balancing: eases everything down a little as sounds pile up
+  A.level = g(1);
+  // brick-wall-ish limiter as the very last stage, so overlapping sounds can't clip
+  A.limit = ctx.createDynamicsCompressor();
+  A.limit.threshold.value = -3; A.limit.knee.value = 0; A.limit.ratio.value = 20;
+  A.limit.attack.value = .002; A.limit.release.value = .08;
   A.an = ctx.createAnalyser(); A.an.fftSize = 4096; A.an.smoothingTimeConstant = .5;
-  A.in.connect(A.tone).connect(A.comp).connect(A.master).connect(A.an).connect(ctx.destination);
+  // ring modulator: the signal multiplied by a sine carrier. Produces sum and
+  // difference tones (f ± carrier) that aren't harmonics of the note, so the
+  // plate is driven at several unrelated frequencies and the figures overlap.
+  A.dry = g(1); A.ringVCA = g(0); A.ringWet = g(0);
+  A.ringOsc = ctx.createOscillator(); A.ringOsc.frequency.value = 40;
+  A.ringOsc.connect(A.ringVCA.gain); A.ringOsc.start();
+  A.in.connect(A.dry).connect(A.tone);
+  A.in.connect(A.ringVCA).connect(A.ringWet).connect(A.tone);
+  A.tone.connect(A.level).connect(A.comp).connect(A.master).connect(A.limit).connect(A.an).connect(ctx.destination);
 
   A.delay = ctx.createDelay(2); A.delay.delayTime.value = .34;
   A.dTone = ctx.createBiquadFilter(); A.dTone.type = 'lowpass'; A.dTone.frequency.value = 2600;
@@ -222,6 +215,8 @@ function applyKnob(k) {
   if (k === 'warble') { set(A.lfoG.gain, K.warble); set(A.wowG.gain, K.warble * .8); }
   if (k === 'tone') set(A.tone.frequency, K.tone);
   if (k === 'echo') { set(A.wet.gain, K.echo * .7); set(A.fb.gain, .12 + K.echo * .6); }
+  // ring: more wet signal and a higher carrier as it turns (40 Hz → 1.6 kHz)
+  if (k === 'ring') { set(A.dry.gain, 1 - .8 * K.ring); set(A.ringWet.gain, K.ring * 1.1); set(A.ringOsc.frequency, 40 * Math.pow(40, K.ring)); }
 }
 
 function osc(type, freq, t, end) {
@@ -271,6 +266,7 @@ const SOUNDS = {
     osc('square', f * 1.005, t, end).connect(lp);
   },
 };
+
 
 /* ───────────── plate physics ───────────── */
 const G = 96;            // field resolution
@@ -468,24 +464,14 @@ function draw() {
   cx.drawImage(mask, 0, 0);
 }
 
-/* ───────────── OLED ───────────── */
-const hzEl = $('#hz'), mdEl = $('#md'), meterEl = $('#meter');
-let oledT = 0;
-function oled(now) {
-  meterEl.style.height = clamp(rms * 300, 0, 100) + '%';
-  if (now - oledT < 120) return; oledT = now;
-  const live = peakHz && rms > .003;
-  hzEl.innerHTML = (live ? Math.round(peakHz) : '---') + '<small>Hz</small>';
-  mdEl.textContent = live && dominant ? `mode ${dominant.n}·${dominant.m}${dominant.s > 0 ? '+' : '−'}` : 'mode –';
-}
 
 function frame(now) {
   if (ctx && !spec) { spec = new Float32Array(A.an.frequencyBinCount); td = new Float32Array(A.an.fftSize); binHz = ctx.sampleRate / A.an.fftSize; }
   updatePlate();
   updateColour(now);
+  balanceLevel(now);
   if (reset) stepReset(now); else { moveSand(); moveSand(); } // two settling steps per frame: figures form within a note's length
   draw();
-  oled(now);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -494,13 +480,24 @@ requestAnimationFrame(frame);
 const keyEls = THEMES.map((th, i) => {
   const b = document.createElement('button');
   b.className = 'key' + (i === 0 ? ' on' : ''); b.style.setProperty('--c', th.plate);
-  b.setAttribute('aria-label', `${th.key} sound`);
-  b.innerHTML = `<span class="dot"></span><span class="cap"><svg viewBox="0 0 24 24">${ICONS[th.key]}</svg></span>`;
+  b.setAttribute('aria-label', `Sound ${i + 1}`);
+  b.innerHTML = `<span class="dot"></span><span class="cap">${i + 1}</span>`;
   b.addEventListener('pointerdown', e => { e.preventDefault(); hit(i); });
   b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); hit(i); } });
   $('#keys').append(b);
   return b;
 });
+
+// level balancing: overall gain eases to 1/√(sounds playing), so a pile-up
+// sums to roughly the loudness of one sound instead of clipping
+const soundEnds = [];
+let levelTarget = 1;
+function balanceLevel(now) {
+  if (!ctx) return;
+  for (let i = soundEnds.length - 1; i >= 0; i--) if (soundEnds[i] < now) soundEnds.splice(i, 1);
+  const t = 1 / Math.sqrt(Math.max(1, soundEnds.length));
+  if (Math.abs(t - levelTarget) > .01) { levelTarget = t; A.level.gain.setTargetAtTime(t, ctx.currentTime, .12); }
+}
 
 function selectTheme(i) {
   theme = i;
@@ -514,6 +511,7 @@ function hit(i) {
   reset = null;
   selectTheme(i);
   until[i] = performance.now() + 2.8 * K.length * 1000;
+  soundEnds.push(performance.now() + (2.8 * K.length + .6) * 1000);
   const b = keyEls[i]; b.classList.add('hit'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('hit'), 140);
 }
 
@@ -543,7 +541,7 @@ KNOBS.forEach(([key, label, min, max, def, log, cap, dot]) => {
   set(norm(def));
 
   let y0, n0;
-  k.addEventListener('pointerdown', e => { k.setPointerCapture(e.pointerId); y0 = e.clientY; n0 = norm(K[key]); e.preventDefault(); k.focus(); });
+  k.addEventListener('pointerdown', e => { k.setPointerCapture(e.pointerId); y0 = e.clientY; n0 = norm(K[key]); e.preventDefault(); });
   k.addEventListener('pointermove', e => { if (k.hasPointerCapture(e.pointerId)) set(n0 + (y0 - e.clientY) / (e.shiftKey ? 700 : 170)); });
   k.addEventListener('wheel', e => { e.preventDefault(); set(norm(K[key]) - e.deltaY * .0015); }, { passive: false });
   k.addEventListener('dblclick', () => set(norm(def)));
@@ -554,10 +552,12 @@ KNOBS.forEach(([key, label, min, max, def, log, cap, dot]) => {
 });
 
 // fifth slot in the knob row: scatter / reset
-const sc = document.createElement('div'); sc.className = 'ctl';
+const sc = document.createElement('div'); sc.className = 'ctl scatter';
 sc.innerHTML = `<button class="round" aria-label="Scatter the sand and reset"><svg viewBox="0 0 24 24">${ICONS.scatter}</svg></button><span>scatter</span>`;
+sc.querySelector('button').addEventListener('pointerdown', e => e.preventDefault()); // don't take focus on click
 sc.querySelector('button').addEventListener('click', startReset);
 $('#knobs').append(sc);
+
 })();
 </script>
 </body>
